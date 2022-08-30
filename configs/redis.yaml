@@ -1,0 +1,5 @@
+host: rediscache
+port: 6379
+db: 0
+password:
+ttl: 60

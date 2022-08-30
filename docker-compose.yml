@@ -1,0 +1,116 @@
+version: '3.9'
+
+services:
+
+  sqlstorage:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: user_db
+    volumes:
+      - 'db:/var/lib/postgresql/data'
+    ports:
+      - "5432:5432"
+
+  migrate:
+    image: migrate/migrate
+    restart: on-failure
+    volumes:
+      - ./migrations:/migrations
+    command:
+      [
+        "-path",
+        "/migrations/pg",
+        "-database",
+        "postgres://postgres:password@sqlstorage:5432/user_db?sslmode=disable",
+        "up"
+      ]
+    depends_on:
+      - sqlstorage
+
+  rediscache:
+    image: redis:6.2-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    command: redis-server --save 20 1 --loglevel warning
+    volumes:
+      - rediscache:/data
+
+  userservice:
+    build:
+      context: ./
+      dockerfile: ./cmd/user_service/Dockerfile
+    restart: always
+    ports:
+      - "50051:50051"
+    depends_on:
+      - sqlstorage
+      - broker
+      - clickhouse
+      - rediscache
+      - migrate
+      - migrate_click
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    restart: always
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - 22181:2181
+
+  broker:
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      - zookeeper
+    restart: always
+    ports:
+      - 29092:29092
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://broker:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui
+    container_name: kafka-ui
+    ports:
+      - "8080:8080"
+    restart: always
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=user_service_1
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=broker:9092
+      - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2181
+
+  clickhouse:
+    image: yandex/clickhouse-server
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+
+  migrate_click:
+    image: migrate/migrate
+    volumes:
+      - ./migrations:/migrations
+    command:
+      [
+        "-path",
+        "/migrations/click",
+        "-database",
+        "clickhouse://clickhouse:9000?username=default&database=default&x-multi-statement=true",
+        "up"
+      ]
+    depends_on:
+      - clickhouse
+
+#OTHER 
+volumes:
+  db: null
+  rediscache: null

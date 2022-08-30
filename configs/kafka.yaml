@@ -1,0 +1,4 @@
+brokers:
+  - broker:9092
+max_attempts: 3
+async: true

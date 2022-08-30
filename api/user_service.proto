@@ -1,0 +1,30 @@
+syntax = "proto3";
+package user_service;
+
+option go_package = "internal/user_service/grpc_transport/proto";
+
+service UserService {
+  rpc GetAllV1(GetAllV1Request) returns (GetAllV1Response) {};
+  rpc CreateV1(CreateV1Request) returns (CreateV1Response) {};
+  rpc DeleteV1(DeleteV1Request) returns (DeleteV1Response) {};
+}
+
+message User {
+  int64 uid = 1;
+  string name = 2;
+  string email = 3;
+  int64 age = 4;
+  bool deleted = 5;
+}
+
+message GetAllV1Request {}
+
+message GetAllV1Response { repeated User users = 1; }
+
+message CreateV1Request { User user = 1; }
+
+message CreateV1Response { int64 uid = 1; }
+
+message DeleteV1Request { int64 uid = 1; }
+
+message DeleteV1Response { int64 uid = 1; }

@@ -1,0 +1,6 @@
+user: postgres
+password: password
+database: user_db
+host: sqlstorage
+sslmode: disable
+port: 5432
